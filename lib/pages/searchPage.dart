@@ -1,128 +1,194 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_instagram_clon/models/postmodel.dart';
 import 'package:flutter_instagram_clon/models/user.model.dart';
 import 'package:flutter_instagram_clon/servises/data_servise.dart';
-import 'package:flutter_instagram_clon/views/appBar_widget.dart';
-import 'package:flutter_instagram_clon/views/feef%20widget.dart';
+import 'package:flutter_instagram_clon/servises/http.servise.dart';
 
 class SearchPage extends StatefulWidget {
   const SearchPage({Key? key}) : super(key: key);
-static const String id = "/SerachPage";
+  static const String id = "/SerachPage";
   @override
   State<SearchPage> createState() => _SearchPageState();
 }
 
 class _SearchPageState extends State<SearchPage> {
-  TextEditingController controller = TextEditingController();
-  List<User> user = [];
   bool isLoading = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _apiSearchUsers("");
-  }
+  List<UserModel> items = [];
+  TextEditingController searchController = TextEditingController();
 
   void _apiSearchUsers(String keyword) {
     setState(() {
       isLoading = true;
     });
-    DataService.searchUsers(keyword).then((users) => _resSearchUser(users));
+    DataService.searchUsers(keyword).then((value) => {_respSearchUsers(value)});
   }
 
-  void _resSearchUser(List<User> users) {
+  void _respSearchUsers(List<UserModel> users) {
     setState(() {
+      items = users;
       isLoading = false;
-      user = users;
     });
+  }
+
+  void _apiFollowUser(UserModel someone) async {
+    setState(() {
+      isLoading = true;
+    });
+    await DataService.followUser(someone);
+    setState(() {
+      someone.followed = true;
+      isLoading = false;
+    });
+    await Network.POST(
+        Network.API_PUSH, Network.bodyCreate(someone.device_token))
+        .then((value) {
+      print(value);
+    });
+    DataService.storePostsToMyFeed(someone);
+  }
+
+  void _apiUnfollowUser(UserModel someone) async {
+    setState(() {
+      isLoading = true;
+    });
+    await DataService.unfollowUser(someone);
+    setState(() {
+      someone.followed = false;
+      isLoading = false;
+    });
+    DataService.removePostsFromMyFeed(someone);
+  }
+
+  @override
+  void initState() {
+    // TODO: implement initState
+    super.initState();
+    _apiSearchUsers("");
+  }
+
+  @override
+  void setState(VoidCallback fn) {
+    // TODO: implement setState
+    if (mounted) super.setState(fn);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: appBar(title: "Search"),
-      body: Stack(
-        children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-
-              // #search
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 5.0, horizontal: 20.0),
-                child: TextField(
-                  controller: controller,
-                  onChanged: (keyword) {
-                    _apiSearchUsers(keyword);
-                  },
-                  decoration: InputDecoration(
-                      contentPadding: EdgeInsets.symmetric(vertical: 5, horizontal: 10),
-                      filled: true,
-                      fillColor: Colors.grey.shade200,
-                      border: InputBorder.none,
-                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.grey.shade200),),
-                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.grey.shade200),),
-                      prefixIcon: Icon(Icons.search, color: Colors.grey,),
-                      hintText: "Search",
-                      hintStyle: TextStyle(color: Colors.grey)
-                  ),
-                ),
-              ),
-
-              // #users
-              Expanded(
-                child: ListView.builder(
-                  itemCount: user.length,
-                  itemBuilder: (context, index) => itemOfUser(user[index]),
-                ),
-              )
-            ],
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          title: const Text(
+            "Search",
+            style: TextStyle(
+                color: Colors.black, fontSize: 25, fontFamily: "Bluevinyl"),
           ),
-
-          if(isLoading) const Center(
-            child: CircularProgressIndicator(),
-          )
-        ],
-      ),
-    );
+          centerTitle: true,
+        ),
+        body: Stack(
+          children: [
+            Container(
+              padding: const EdgeInsets.only(left: 20, right: 20),
+              child: Column(
+                children: [
+                  // #searchuser
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 10),
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    decoration: BoxDecoration(
+                        color: Colors.grey.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(7)),
+                    height: 45,
+                    child: TextField(
+                      style: const TextStyle(color: Colors.black87),
+                      controller: searchController,
+                      onChanged: (input) {
+                        _apiSearchUsers(input);
+                      },
+                      decoration: const InputDecoration(
+                          hintText: "Search",
+                          border: InputBorder.none,
+                          hintStyle:
+                          TextStyle(fontSize: 15, color: Colors.grey),
+                          icon: Icon(
+                            Icons.search,
+                            color: Colors.grey,
+                          )),
+                    ),
+                  ),
+                  Expanded(
+                      child: ListView.builder(
+                          itemCount: items.length,
+                          itemBuilder: (context, index) {
+                            return _itemOfUser(items[index]);
+                          }))
+                ],
+              ),
+            ),
+            isLoading
+                ? const Center(child: CircularProgressIndicator.adaptive())
+                : const SizedBox.shrink()
+          ],
+        ));
   }
 
-  Widget itemOfUser(User user) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      child: ListTile(
-        leading: Container(
-          decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(50),
-              border: Border.all(color: Colors.purpleAccent, width: 2)
-          ),
-          padding: EdgeInsets.all(2),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(25),
-            child: user.imageUrl != null ? CachedNetworkImage(
-              height: 40,
-              width: 40,
-              fit: BoxFit.cover,
-              imageUrl: user.imageUrl!,
-              placeholder: (context, url) => const Image(image: AssetImage("assets/images/user.png")),
-              errorWidget: (context, url, error) => Icon(Icons.error),
-            ) : const Image(image: AssetImage("assets/images/user.png"), height: 40, width: 40,),
+  Widget _itemOfUser(UserModel user) {
+    return ListTile(
+      onTap: () {
+            },
+      contentPadding: EdgeInsets.zero,
+      leading: Container(
+        padding: const EdgeInsets.all(2),
+        decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(70),
+            border: Border.all(
+                width: 1.5, color: const Color.fromRGBO(193, 53, 132, 1))),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(22.5),
+          child: user.img_url.isEmpty
+              ? Image.asset(
+            "assets/images/background.png",
+            width: 45,
+            height: 45,
+            fit: BoxFit.cover,
+          )
+              : CachedNetworkImage(
+            imageUrl: user.img_url,
+            width: 45,
+            height: 45,
+            fit: BoxFit.cover,
           ),
         ),
-        title: Text(user.fullName, style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),),
-        subtitle: Text(user.email, style: TextStyle(color: Colors.black54,)),
-        trailing: Container(
+      ),
+      title: Text(
+        user.fullName,
+        style: const TextStyle(fontWeight: FontWeight.bold),
+      ),
+      subtitle: Text(
+        user.email,
+        style: const TextStyle(color: Colors.black54),
+        softWrap: true,
+        overflow: TextOverflow.ellipsis,
+      ),
+      trailing: GestureDetector(
+        onTap: () {
+          if (user.followed) {
+            _apiUnfollowUser(user);
+          } else {
+            _apiFollowUser(user);
+          }
+        },
+        child: Container(
+          alignment: Alignment.center,
+          width: 100,
           height: 30,
           decoration: BoxDecoration(
-            border: Border.all(color: Colors.grey),
-            borderRadius: BorderRadius.circular(5),
-          ),
-          child: MaterialButton(
-            onPressed: () {},
-            child: Text("Follow", style: TextStyle(color: Colors.black87,), ),
-          ),
+              border: Border.all(
+                width: 1,
+                color: Colors.grey,
+              ),
+              borderRadius: BorderRadius.circular(3)),
+          child: user.followed ? const Text("Following") : const Text("Follow"),
         ),
       ),
     );

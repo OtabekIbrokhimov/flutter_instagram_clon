@@ -1,5 +1,4 @@
 import 'dart:io';
-
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_instagram_clon/models/postmodel.dart';
@@ -7,7 +6,7 @@ import 'package:flutter_instagram_clon/models/user.model.dart';
 import 'package:flutter_instagram_clon/servises/auth_servise.dart';
 import 'package:flutter_instagram_clon/servises/data_servise.dart';
 import 'package:flutter_instagram_clon/servises/file_service.dart';
-import 'package:flutter_instagram_clon/views/appBar_widget.dart';
+import 'package:flutter_instagram_clon/utils/utilServise.dart';
 import 'package:image_picker/image_picker.dart';
 
 class ProfilePage extends StatefulWidget {
@@ -20,282 +19,407 @@ static const String id = "/ProfilePage";
 class _ProfilePageState extends State<ProfilePage> {
   bool isLoading = false;
   List<Post> items = [];
+  int axisCount = 1;
   File? _image;
-  User? user;
-  int countPosts = 0;
+  String fullName = "";
+  String email = "";
+  String img_url = "";
+  int count_post = 0;
+  int followers = 0;
+  int following = 0;
+
+  void _apiLoadUser() {
+    setState(() {
+      isLoading = true;
+    });
+    DataService.loadUser(null).then((value) => _showUserInfo(value));
+  }
+
+  void _showUserInfo(UserModel userModel) {
+    setState(() {
+      fullName = userModel.fullName;
+      email = userModel.email;
+      img_url = userModel.img_url;
+      followers = userModel.followers;
+      following = userModel.followings;
+      isLoading = false;
+    });
+  }
+
+  void _apiChangePhoto() {
+    if (_image == null) return;
+    setState(() {
+      isLoading = true;
+    });
+    FileService.uploadUserImage(_image!)
+        .then((downLoadUrl) => _apiUpdateUser(downLoadUrl!));
+  }
+
+  void _apiUpdateUser(String downLoadUrl) async {
+    UserModel userModel = await DataService.loadUser(null);
+    userModel.img_url = downLoadUrl;
+    await DataService.updateUser(userModel);
+    await DataService.updatePostsToFollowersFeed(userModel);
+    _apiLoadUser();
+  }
+
+  void  _apiLoadPost() {
+    setState(() {
+      isLoading = true;
+    });
+    DataService.loadPosts(null).then((value) => {_resLoadPosts(value)});
+  }
+
+  void _resLoadPosts(List<Post> posts) {
+    setState(() {
+      items = posts;
+      count_post = items.length;
+      isLoading = false;
+    });
+  }
 
   @override
   void initState() {
+    // TODO: implement initState
     super.initState();
     _apiLoadUser();
     _apiLoadPost();
   }
 
-  // for user image
-  _imgFromCamera() async {
-    XFile? image = await ImagePicker().pickImage(
-        source: ImageSource.camera, imageQuality: 50
-    );
-
+  _imgFromGalleryCamera(source) async {
+    XFile? image =
+    await ImagePicker().pickImage(source: source, imageQuality: 50);
     setState(() {
       _image = File(image!.path);
     });
     _apiChangePhoto();
   }
 
-  _imgFromGallery() async {
-    XFile? image = await  ImagePicker().pickImage(
-        source: ImageSource.gallery, imageQuality: 50
-    );
-
-    setState(() {
-      _image = File(image!.path);
-    });
-    _apiChangePhoto();
-  }
-
-  void _showPicker(context) {
+  void bottomSheet() {
     showModalBottomSheet(
         context: context,
-        builder: (BuildContext bc) {
-          return SafeArea(
-            child: Wrap(
-              children: <Widget>[
+        builder: (context) {
+          return SizedBox(
+            height: MediaQuery.of(context).size.height * 0.15,
+            child: Column(
+              children: [
                 ListTile(
-                    leading: Icon(Icons.photo_library),
-                    title: Text('Photo Library'),
-                    onTap: () {
-                      _imgFromGallery();
-                      Navigator.of(context).pop();
-                    }),
-                ListTile(
-                  leading: Icon(Icons.photo_camera),
-                  title: Text('Camera'),
                   onTap: () {
-                    _imgFromCamera();
-                    Navigator.of(context).pop();
+                    _imgFromGalleryCamera(ImageSource.gallery);
+                    Navigator.pop(context);
                   },
+                  leading: const Icon(Icons.photo_library),
+                  title: const Text("Pick Photo"),
+                ),
+                ListTile(
+                  onTap: () {
+                    _imgFromGalleryCamera(ImageSource.camera);
+                    Navigator.pop(context);
+                  },
+                  leading: const Icon(Icons.camera_alt),
+                  title: const Text("Take Photo"),
                 ),
               ],
             ),
           );
-        }
-    );
+        });
   }
 
-  // for load user
-  void _apiLoadUser() async {
-    setState(() {
-      isLoading = true;
-    });
-    DataService.loadUser().then((value) => _showUserInfo(value));
+  void _actionLogOut() async {
+    var result = await Utils.dialogCommon(
+        context, "Insta Clone", "Do you want to log out?", false);
+    if (result) AuthService.signOutUser(context);
   }
 
-  void _showUserInfo(User user) {
-    setState(() {
-      this.user = user;
-      isLoading = false;
-    });
+  void _actionRemovePost(Post post) async {
+    var result = await Utils.dialogCommon(
+        context, "Insta Clone", "Do you want to remove this post?", false);
+    if (result) {
+      setState(() {
+        isLoading = true;
+      });
+      DataService.removePost(post).then((value) => {_apiLoadPost()});
+    }
   }
 
-  // for edit user
-  void _apiChangePhoto() {
-    if(_image == null) return;
-
-    setState(() {
-      isLoading = true;
-    });
-    FileService.uploadImage(_image!, FileService.folderUserImg).then((value) => _apiUpdateUser(value));
+  @override
+  void setState(VoidCallback fn) {
+    // TODO: implement setState
+    if (mounted) super.setState(fn);
   }
-
-  void _apiUpdateUser(String imgUrl) async{
-    setState(() {
-      isLoading = false;
-      user!.imageUrl = imgUrl;
-    });
-    await DataService.updateUser(user!);
-  }
-
-  // for load post
-  void _apiLoadPost() {
-    DataService.loadPosts().then((posts) => {
-      _resLoadPost(posts)
-    });
-  }
-
-  void _resLoadPost(List<Post> posts) {
-    setState(() {
-      items = posts;
-      countPosts = posts.length;
-    });
-  }
-
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: appBar(title: "Profile", icon: Icon(Icons.exit_to_app, color: Colors.black87,), onPressed: () {
-        AuthService.deleteAccount(context);
-      }),
-      body: Stack(
-        children: [
-          Container(
-            height: MediaQuery.of(context).size.height,
-            width: MediaQuery.of(context).size.width,
-            padding: EdgeInsets.symmetric(horizontal: 15),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                // #avatar
-                Stack(
-                  children: [
-                    Container(
-                      height: 75,
-                      width: 75,
-                      decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(50),
-                          border: Border.all(color: Colors.purpleAccent, width: 2)),
-                      padding: EdgeInsets.all(2),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(75),
-                        child:  user?.imageUrl == null || user!.imageUrl!.isEmpty ? const Image(
-                          image: AssetImage("assets/images/user.png"),
-                          height: 50,
-                          width: 50,
-                          fit: BoxFit.cover,
-                        ) : Image(
-                          image: NetworkImage(user!.imageUrl!),
-                          height: 50,
-                          width: 50,
-                          fit: BoxFit.cover,
-                        ),
-                      ),
-                    ),
-                    Container(
-                      height: 77.5,
-                      width: 77.5,
-                      alignment: Alignment.bottomRight,
-                      child: Container(
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          title: const Text(
+            "Profile",
+            style: TextStyle(
+                color: Colors.black, fontSize: 25, fontFamily: "Bluevinyl"),
+          ),
+          centerTitle: true,
+          actions: [
+            IconButton(
+                onPressed: _actionLogOut,
+                icon: const Icon(
+                  Icons.exit_to_app,
+                  color: Color.fromRGBO(193, 53, 132, 1),
+                ))
+          ],
+        ),
+        body: Stack(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              width: double.infinity,
+              child: Column(
+                children: [
+                  // #myphoto
+                  Stack(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(2),
                         decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: IconButton(
-                            padding: EdgeInsets.zero,
-                            constraints: BoxConstraints(),
-                            onPressed: () {
-                              _showPicker(context);
-                            },
-                            icon: Icon(
-                              Icons.add_circle,
-                              color: Colors.purple,
+                            borderRadius: BorderRadius.circular(70),
+                            border: Border.all(
+                                width: 1.5,
+                                color: const Color.fromRGBO(193, 53, 132, 1))),
+                        child: ClipRRect(
+                            borderRadius: BorderRadius.circular(35),
+                            child: img_url == ""
+                                ? Image.asset(
+                              "assets/images/background.png",
+                              width: 70,
+                              height: 70,
+                            )
+                                : CachedNetworkImage(
+                              imageUrl: img_url,
+                              width: 70,
+                              height: 70,
+                              fit: BoxFit.cover,
                             )),
                       ),
-                    )
-                  ],
-                ),
-                SizedBox(height: 10,),
-
-                // #name
-                Text(user == null ? "": user!.fullName.toUpperCase(), style: TextStyle(color: Colors.black, fontSize: 16, fontWeight: FontWeight.bold),),
-
-                // #email
-                Text(user == null ? "": user!.email, style: TextStyle(color: Colors.black54, fontSize: 14),),
-                SizedBox(height: 15,),
-
-                // #statistics
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    Expanded(
-                      child: RichText(
-                        textAlign: TextAlign.center,
-                        text: TextSpan(
-                            style: TextStyle(fontSize: 16, color: Colors.black, fontWeight: FontWeight.bold),
-                            text: countPosts.toString() + "\n",
-                            children: [
-                              TextSpan(
-                                style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w500, fontSize: 14),
-                                text: "POST",
-                              )
-                            ]
-                        ),
-                      ),
-                    ),
-                    Container(
-                      height: 20,
-                      width: 1,
-                      color: Colors.grey,
-                    ),
-                    Expanded(
-                      child: RichText(
-                        textAlign: TextAlign.center,
-                        text: TextSpan(
-                            style: TextStyle(fontSize: 16, color: Colors.black, fontWeight: FontWeight.bold),
-                            text: user == null ? "0": user!.followersCount.toString() + "\n",
-                            children: [
-                              TextSpan(
-                                style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w500, fontSize: 14),
-                                text: "FOLLOWERS",
-                              )
-                            ]
-                        ),
-                      ),
-                    ),
-                    Container(
-                      height: 20,
-                      width: 1,
-                      color: Colors.grey,
-                    ),
-                    Expanded(
-                      child: RichText(
-                        textAlign: TextAlign.center,
-                        text: TextSpan(
-                            style: TextStyle(fontSize: 16, color: Colors.black, fontWeight: FontWeight.bold),
-                            text: user == null ? "0": user!.followingCount.toString() + "\n",
-                            children: [
-                              TextSpan(
-                                style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w500, fontSize: 14),
-                                text: "FOLLOWING",
-                              )
-                            ]
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                SizedBox(height: 20,),
-
-                // #posts
-                Expanded(
-                  child: ListView.builder(
-                      itemCount: items.length,
-                      itemBuilder: (context, index) {
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.center,
+                      SizedBox(
+                        width: 80,
+                        height: 80,
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
-                            CachedNetworkImage(
-                              width: MediaQuery.of(context).size.width,
-                              fit: BoxFit.cover,
-                              imageUrl: items[index].postImage,
-                              placeholder: (context, url) => Container(color: Colors.grey,),
-                              errorWidget: (context, url, error) => Icon(Icons.error),
-                            ),
-                            Text(items[index].caption, textAlign: TextAlign.center,),
-                            SizedBox(height: 15,),
+                            GestureDetector(
+                              onTap: bottomSheet,
+                              child: const Icon(
+                                Icons.add_circle,
+                                color: Colors.purple,
+                              ),
+                            )
                           ],
-                        );
-                      }),
-                ),
-              ],
-            ),
-          ),
+                        ),
+                      ),
+                    ],
+                  ),
 
-          if(isLoading) const Center(
-            child: CircularProgressIndicator(),
-          )
-        ],
+                  // #myinfos
+                  const SizedBox(
+                    height: 10,
+                  ),
+                  Text(
+                    fullName.toUpperCase(),
+                    style: const TextStyle(
+                        color: Colors.black,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(
+                    height: 3,
+                  ),
+                  Text(
+                    email,
+                    style: const TextStyle(
+                        color: Colors.black54,
+                        fontSize: 14,
+                        fontWeight: FontWeight.normal),
+                  ),
+
+                  // #mycounts
+                  SizedBox(
+                    height: 80,
+                    child: Row(
+                      children: [
+                        Expanded(
+                            child: Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    count_post.toString(),
+                                    style: const TextStyle(
+                                        color: Colors.black,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold),
+                                  ),
+                                  const SizedBox(
+                                    height: 3,
+                                  ),
+                                  const Text(
+                                    "POSTS",
+                                    style: TextStyle(
+                                        color: Colors.grey,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.normal),
+                                  )
+                                ],
+                              ),
+                            )),
+                        Container(
+                          width: 1,
+                          height: 20,
+                          color: Colors.grey.withOpacity(0.5),
+                        ),
+                        Expanded(
+                            child: Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    followers.toString(),
+                                    style: const TextStyle(
+                                        color: Colors.black,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold),
+                                  ),
+                                  const SizedBox(
+                                    height: 3,
+                                  ),
+                                  const Text(
+                                    "FOLLOWERS",
+                                    style: TextStyle(
+                                        color: Colors.grey,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.normal),
+                                  )
+                                ],
+                              ),
+                            )),
+                        Container(
+                          width: 1,
+                          height: 20,
+                          color: Colors.grey.withOpacity(0.5),
+                        ),
+                        Expanded(
+                            child: Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    following.toString(),
+                                    style: const TextStyle(
+                                        color: Colors.black,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold),
+                                  ),
+                                  const SizedBox(
+                                    height: 3,
+                                  ),
+                                  const Text(
+                                    "FOLLOWING",
+                                    style: TextStyle(
+                                        color: Colors.grey,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.normal),
+                                  )
+                                ],
+                              ),
+                            )),
+                      ],
+                    ),
+                  ),
+
+                  // #gridselect
+                  SizedBox(
+                    height: 50,
+                    child: Row(
+                      children: [
+                        Expanded(
+                            child: Center(
+                                child: IconButton(
+                                  onPressed: () {
+                                    setState(() {
+                                      axisCount = 1;
+                                    });
+                                  },
+                                  icon: const Icon(
+                                    Icons.list_alt,
+                                    size: 27,
+                                  ),
+                                ))),
+                        Expanded(
+                            child: Center(
+                                child: IconButton(
+                                  onPressed: () {
+                                    setState(() {
+                                      axisCount = 2;
+                                    });
+                                  },
+                                  icon: const Icon(
+                                    Icons.grid_view,
+                                    size: 27,
+                                  ),
+                                ))),
+                      ],
+                    ),
+                  ),
+
+                  Expanded(
+                      child: GridView.builder(
+                          itemCount: items.length,
+                          gridDelegate:
+                          SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: axisCount),
+                          itemBuilder: (context, index) {
+                            return _itemOfPost(items[index]);
+                          }))
+                ],
+              ),
+            ),
+            isLoading
+                ? const Center(child: CircularProgressIndicator.adaptive())
+                : const SizedBox.shrink()
+          ],
+        ));
+  }
+
+  Widget _itemOfPost(Post post) {
+    return GestureDetector(
+      onLongPress: () {
+        _actionRemovePost(post);
+      },
+      child: Container(
+        margin: const EdgeInsets.all(5),
+        child: Column(
+          children: [
+            Expanded(
+              child: CachedNetworkImage(
+                width: double.infinity,
+                imageUrl: post.img_post,
+                placeholder: (context, url) =>
+                const Center(child: CircularProgressIndicator.adaptive()),
+                errorWidget: (context, url, error) => const Icon(Icons.error),
+                fit: BoxFit.cover,
+              ),
+            ),
+            const SizedBox(
+              height: 3,
+            ),
+            Text(
+              post.caption,
+              style: TextStyle(color: Colors.black87.withOpacity(0.7)),
+              maxLines: 2,
+            )
+          ],
+        ),
       ),
     );
   }

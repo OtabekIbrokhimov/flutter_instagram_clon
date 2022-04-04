@@ -1,7 +1,17 @@
+import 'dart:io';
+
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_instagram_clon/models/postmodel.dart';
-import 'package:flutter_instagram_clon/views/appBar_widget.dart';
-import 'package:flutter_instagram_clon/views/feef%20widget.dart';
+import 'package:flutter_instagram_clon/servises/data_servise.dart';
+import 'package:flutter_instagram_clon/utils/utilServise.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:http/http.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
+
+
+
 
 class Likes extends StatefulWidget {
   const Likes({Key? key}) : super(key: key);
@@ -11,25 +21,219 @@ static const String id = "/LikesPage";
 }
 
 class _LikesState extends State<Likes> {
+  bool isLoading = false;
   List<Post> items = [];
+
+  void _apiLoadLikes() {
+    setState(() {
+      isLoading = true;
+    });
+    DataService.loadLikes().then((value) => {_resLoadLikes(value)});
+  }
+
+  void _resLoadLikes(List<Post> posts) {
+    setState(() {
+      items = posts;
+      isLoading = false;
+    });
+  }
+
+  void _apiPostUnlike(Post post) async {
+    setState(() {
+      isLoading = true;
+    });
+    await DataService.likePost(post, false).then((value) => {_apiLoadLikes()});
+  }
+
+  void _actionRemovePost(Post post) async {
+    var result = await Utils.dialogCommon(
+        context, "Insta Clone", "Do you want to remove this post?", false);
+    if (result) {
+      setState(() {
+        isLoading = true;
+      });
+      DataService.removePost(post).then((value) => {_apiLoadLikes()});
+    }
+  }
 
   @override
   void initState() {
+    // TODO: implement initState
     super.initState();
-    items.addAll([
-      Post(postImage: "https://firebasestorage.googleapis.com/v0/b/koreanguideway.appspot.com/o/develop%2Fpost.png?alt=media&token=f0b1ba56-4bf4-4df2-9f43-6b8665cdc964", caption: "Discover more great images on our sponsor's site",),
-      Post(postImage: "https://firebasestorage.googleapis.com/v0/b/koreanguideway.appspot.com/o/develop%2Fpost2.png?alt=media&token=ac0c131a-4e9e-40c0-a75a-88e586b28b72", caption: "Discover more great images on our sponsor's site",)
-    ]);
+    _apiLoadLikes();
+  }
+
+  @override
+  void setState(VoidCallback fn) {
+    // TODO: implement setState
+    if (mounted) super.setState(fn);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: appBar(title: "Likes",),
-      body: ListView.builder(
-        itemCount: items.length,
-        itemBuilder: (context, index) => FeedWidget(post: items[index]),
-      ),
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          title: const Text(
+            "Likes",
+            style: TextStyle(
+                color: Colors.black, fontSize: 25, fontFamily: "Bluevinyl"),
+          ),
+          centerTitle: true,
+        ),
+        body: Stack(
+          children: [
+            items.isEmpty
+                ? const Center(
+              child: Text("No liked posts"),
+            )
+                : ListView.builder(
+                itemCount: items.length,
+                itemBuilder: (context, index) {
+                  return _itemOfPost(items[index]);
+                }),
+            isLoading
+                ? const Center(child: CircularProgressIndicator.adaptive())
+                : const SizedBox.shrink()
+          ],
+        ));
+  }
+
+  Widget _itemOfPost(Post post) {
+    return Column(
+      children: [
+        const Divider(),
+
+        // #userinfo
+        Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            child: ListTile(
+              onTap: (){
+                if (!post.mine) {
+                        }
+              },
+              dense: true,
+              visualDensity: VisualDensity.compact,
+              contentPadding: EdgeInsets.zero,
+              leading: ClipRRect(
+                borderRadius: BorderRadius.circular(40),
+                child: post.img_user!.isEmpty || post.img_user == null
+                    ? Image.asset(
+                  "assets/images/background.png",
+                  width: 40,
+                  height: 40,
+                  fit: BoxFit.cover,
+                )
+                    : CachedNetworkImage(
+                    imageUrl: post.img_user!,
+                    width: 40,
+                    height: 40,
+                    fit: BoxFit.cover),
+              ),
+              title: Text(
+                post.fullName!,
+                style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black,
+                    fontSize: 16),
+              ),
+              subtitle: Text(
+                post.date!,
+                style: const TextStyle(
+                    fontWeight: FontWeight.normal, fontSize: 13),
+              ),
+              trailing: post.mine
+                  ? IconButton(
+                  onPressed: () {
+                    _actionRemovePost(post);
+                  },
+                  icon: const Icon(
+                    Icons.more_horiz,
+                    color: Colors.black,
+                  ))
+                  : const SizedBox.shrink(),
+            )),
+
+        // #image
+        CachedNetworkImage(
+          width: MediaQuery.of(context).size.width,
+          height: MediaQuery.of(context).size.width,
+          imageUrl: post.img_post,
+          placeholder: (context, url) =>
+          const Center(child: CircularProgressIndicator.adaptive()),
+          errorWidget: (context, url, error) => const Icon(Icons.error),
+          fit: BoxFit.cover,
+        ),
+
+        // #likeshare
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                IconButton(
+                    onPressed: () {
+                      if (post.liked) {
+                        _apiPostUnlike(post);
+                      }
+                    },
+                    icon: post.liked
+                        ? const FaIcon(
+                      FontAwesomeIcons.solidHeart,
+                      color: Colors.red,
+                    )
+                        : const FaIcon(FontAwesomeIcons.heart)),
+                IconButton(
+                    onPressed: () {
+                      _fileShare(post);
+                    },
+                    icon: const FaIcon(
+                      Icons.share_outlined,
+                    )),
+              ],
+            )
+          ],
+        ),
+
+        // #caption
+        Container(
+          width: MediaQuery.of(context).size.width,
+          margin: const EdgeInsets.only(left: 10, right: 10, bottom: 10),
+          child: RichText(
+            softWrap: true,
+            overflow: TextOverflow.visible,
+            text: TextSpan(children: [
+              TextSpan(
+                  text: post.caption,
+                  style: const TextStyle(color: Colors.black))
+            ]),
+          ),
+        )
+      ],
     );
+  }
+  void _fileShare(Post post) async {
+    setState(() {
+      isLoading = true;
+    });
+    final box = context.findRenderObject() as RenderBox?;
+    if (Platform.isAndroid || Platform.isIOS) {
+      var response = await get(Uri.parse(post.img_post));
+      final documentDirectory = (await getExternalStorageDirectory())?.path;
+      File imgFile = File('$documentDirectory/flutter.png');
+      imgFile.writeAsBytesSync(response.bodyBytes);
+      Share.shareFiles([File('$documentDirectory/flutter.png').path],
+          subject: 'Instagram',
+          text: post.caption,
+          sharePositionOrigin: box!.localToGlobal(Offset.zero) & box.size);
+    } else {
+      Share.share('Hello, check your share files!',
+          subject: 'URL File Share',
+          sharePositionOrigin: box!.localToGlobal(Offset.zero) & box.size);
+    }
+    setState(() {
+      isLoading = false;
+    });
   }
 }

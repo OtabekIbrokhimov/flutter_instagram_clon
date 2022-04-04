@@ -1,15 +1,15 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_instagram_clon/models/postmodel.dart';
-import 'package:flutter_instagram_clon/pages/homePage.dart';
 import 'package:flutter_instagram_clon/servises/data_servise.dart';
 import 'package:flutter_instagram_clon/servises/file_service.dart';
-import 'package:flutter_instagram_clon/views/appBar_widget.dart';
 import 'package:image_picker/image_picker.dart';
 
 
 class UploadPage extends StatefulWidget {
-  const UploadPage({Key? key}) : super(key: key);
+  PageController pageController;
+
+  UploadPage({Key? key, required this.pageController}) : super(key: key);
   static const String id = "/UploadPage";
 
   @override
@@ -21,62 +21,18 @@ class _UploadPageState extends State<UploadPage> {
   TextEditingController captionController = TextEditingController();
   File? _image;
 
-  // for image
-  _imgFromCamera() async {
-    XFile? image = await ImagePicker().pickImage(
-        source: ImageSource.camera, imageQuality: 50
-    );
-
+  _imgFromGalleryCamera(source) async {
+    XFile? image =
+    await ImagePicker().pickImage(source: source, imageQuality: 50);
     setState(() {
       _image = File(image!.path);
     });
   }
 
-  _imgFromGallery() async {
-    XFile? image = await  ImagePicker().pickImage(
-        source: ImageSource.gallery, imageQuality: 50
-    );
-
-    setState(() {
-      _image = File(image!.path);
-    });
-  }
-
-  void _showPicker(context) {
-    showModalBottomSheet(
-        context: context,
-        builder: (BuildContext bc) {
-          return SafeArea(
-            child: Wrap(
-              children: <Widget>[
-                ListTile(
-                    leading: Icon(Icons.photo_library),
-                    title: Text('Photo Library'),
-                    onTap: () {
-                      _imgFromGallery();
-                      Navigator.of(context).pop();
-                    }),
-                ListTile(
-                  leading: Icon(Icons.photo_camera),
-                  title: Text('Camera'),
-                  onTap: () {
-                    _imgFromCamera();
-                    Navigator.of(context).pop();
-                  },
-                ),
-              ],
-            ),
-          );
-        }
-    );
-  }
-
-  // for post
-  void _uploadNewPost() {
-    String caption = captionController.text.trim().toString();
-    if(caption.isEmpty || _image == null) return;
-
-    // Send post  to Server
+  _uploadNewPost() {
+    String caption = captionController.text.toString().trim();
+    if (caption.isEmpty) return;
+    if (_image == null) return;
     _apiPostImage();
   }
 
@@ -84,104 +40,176 @@ class _UploadPageState extends State<UploadPage> {
     setState(() {
       isLoading = true;
     });
-
-    FileService.uploadImage(_image!, FileService.folderPostImg).then((imageUrl) => {
-      _resPostImage(imageUrl),
-    });
+    FileService.uploadPostImage(_image)
+        .then((downloadUrl) => {_resPostImage(downloadUrl!)});
   }
 
-  void _resPostImage(String imageUrl) {
-    String caption = captionController.text.trim().toString();
-    Post post = Post(postImage: imageUrl, caption: caption);
+  void _resPostImage(String downloadUrl) {
+    String caption = captionController.text.toString().trim();
+    Post post = Post(caption: caption, img_post: downloadUrl);
     _apiStorePost(post);
   }
 
   void _apiStorePost(Post post) async {
-    // Post to posts folder
     Post posted = await DataService.storePost(post);
-    // Post to feeds folder
-    DataService.storeFeed(posted).then((value) => {
-      _moveToFeed(),
-    });
+    DataService.storeFeed(posted).then((value) => {_moveToFeed()});
   }
 
   void _moveToFeed() {
     setState(() {
       isLoading = false;
+      _image = null;
+      captionController.clear();
     });
-    Navigator.pushReplacementNamed(context, HomePage.id);
+    widget.pageController.jumpToPage(0);
+  }
+
+  void bottomSheet() {
+    showModalBottomSheet(
+        context: context,
+        builder: (context) {
+          return SizedBox(
+            height: MediaQuery
+                .of(context)
+                .size
+                .height * 0.15,
+            child: Column(
+              children: [
+                ListTile(
+                  onTap: () {
+                    _imgFromGalleryCamera(ImageSource.gallery);
+                    Navigator.pop(context);
+                  },
+                  leading: const Icon(Icons.photo_library),
+                  title: const Text("Pick Photo"),
+                ),
+                ListTile(
+                  onTap: () {
+                    _imgFromGalleryCamera(ImageSource.camera);
+                    Navigator.pop(context);
+                  },
+                  leading: const Icon(Icons.camera_alt),
+                  title: const Text("Take Photo"),
+                ),
+              ],
+            ),
+          );
+        });
+  }
+
+  @override
+  void setState(VoidCallback fn) {
+    // TODO: implement setState
+    if (mounted) super.setState(fn);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: appBar(title: "Upload", icon: Icon(Icons.post_add, color: Colors.purple, size: 27.5,), onPressed: _uploadNewPost),
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+        centerTitle: true,
+        title: const Text(
+          "Upload",
+          style: TextStyle(
+              color: Colors.black, fontSize: 25, fontFamily: "Bluevinyl"),
+        ),
+        actions: [
+          IconButton(
+              onPressed: _uploadNewPost,
+              icon: const Icon(
+                Icons.drive_folder_upload,
+                color: Color.fromRGBO(193, 53, 132, 1),
+              ))
+        ],
+      ),
       body: Stack(
         children: [
-          SizedBox(
-            height: MediaQuery.of(context).size.height,
-            child: SingleChildScrollView(
-              child: Column(
-                children: [
-
-                  // #image
-                  InkWell(
-                    onTap: () {
-                      _showPicker(context);
-                    },
-                    child: Container(
-                      height: MediaQuery.of(context).size.width,
-                      width: MediaQuery.of(context).size.width,
-                      color: Colors.grey.shade300,
-                      child: _image != null ?
-                      Stack(
-                        children: [
-                          Image.file(_image!,
-                            fit: BoxFit.cover,
-                            height: double.infinity,
-                            width: double.infinity,),
-
-                          Container(
-                            height: double.infinity,
-                            width: double.infinity,
-                            alignment: Alignment.topRight,
-                            child: IconButton(
-                              onPressed: () {
-                                setState(() {
-                                  _image = null;
-                                });
-                              },
-                              icon: Icon(Icons.cancel_outlined, color: Colors.white,),
+          SingleChildScrollView(
+              child: SizedBox(
+                height: MediaQuery
+                    .of(context)
+                    .size
+                    .height,
+                child: Column(
+                  children: [
+                    GestureDetector(
+                      onTap: bottomSheet,
+                      child: Container(
+                        width: double.infinity,
+                        height: MediaQuery
+                            .of(context)
+                            .size
+                            .width,
+                        color: Colors.grey.withOpacity(0.4),
+                        child: _image == null
+                            ? const Center(
+                          child: Icon(
+                            Icons.add_a_photo,
+                            size: 60,
+                            color: Colors.grey,
+                          ),
+                        )
+                            : Stack(
+                          children: [
+                            Image.file(
+                              _image!,
+                              width: double.infinity,
+                              height: double.infinity,
+                              fit: BoxFit.cover,
                             ),
-                          )
-                        ],
-                      )
-                          : const Center(
-                        child: Icon(Icons.add_a_photo, size: 60, color: Colors.grey,),
+                            Container(
+                              width: double.infinity,
+                              color: Colors.black12,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  IconButton(
+                                    onPressed: () {
+                                      setState(() {
+                                        _image = null;
+                                      });
+                                    },
+                                    icon: const Icon(Icons.highlight_remove),
+                                    color: Colors.white,
+                                  )
+                                ],
+                              ),
+                            )
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-
-                  // #caption
-                  Container(
-                    padding: EdgeInsets.symmetric(vertical: 10, horizontal: 10.0),
-                    child: TextField(
-                      controller: captionController,
-                      decoration: InputDecoration(
-                        hintText: "Caption",
-                        hintStyle: TextStyle(color: Colors.grey),
+                    Container(
+                      margin: const EdgeInsets.only(
+                          left: 10, right: 10, top: 10),
+                      child: TextField(
+                        controller: captionController,
+                        style: const TextStyle(color: Colors.black),
+                        keyboardType: TextInputType.multiline,
+                        minLines: 1,
+                        maxLines: 5,
+                        decoration: const InputDecoration(
+                            focusedBorder: UnderlineInputBorder(
+                              borderSide: BorderSide(
+                                color: Color.fromRGBO(193, 53, 132, 1),
+                              ),
+                            ),
+                            hintText: "Caption",
+                            hintStyle:
+                            TextStyle(fontSize: 17, color: Colors.black38)),
                       ),
-                      keyboardType: TextInputType.multiline,
-                    ),
-                  )
-                ],
-              ),
-            ),
-          ),
-
-          if(isLoading) const Center(
-            child: CircularProgressIndicator(),
+                    )
+                  ],
+                ),
+              )),
+          isLoading
+              ? const Center(
+            child: CircularProgressIndicator.adaptive(),
           )
+              : const SizedBox.shrink()
         ],
       ),
     );

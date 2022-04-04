@@ -1,30 +1,27 @@
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:hive/hive.dart';
 
-enum StorageKeys {
-  UID,
-  TOKEN,
-}
+class HiveDB {
+  static String DB_NAME = "firebase";
+  static var box = Hive.box(DB_NAME);
 
-class Prefs {
-  static store(StorageKeys key, String data) async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    prefs.setString(_getKey(key), data);
+  static void storeUid(String uid) async {
+    box.put("uid", uid);
   }
 
-  static Future<String?> load(StorageKeys key) async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_getKey(key));
+  static String loadUid() {
+    return box.get("uid", defaultValue: "");
   }
 
-  static Future<bool> remove(StorageKeys key) async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    return prefs.remove(_getKey(key));
+  static Future<void> removeUid() {
+    return box.delete("uid");
   }
 
-  static String _getKey(StorageKeys key) {
-    switch(key) {
-      case StorageKeys.UID: return "uid";
-      case StorageKeys.TOKEN: return "token";
-    }
+  // Firebase Token
+  static void saveFCM(String fcm_token) async {
+    box.put('fcm_token', fcm_token);
+  }
+
+  static String loadFCM() {
+    return box.get("fcm_token", defaultValue: "");
   }
 }

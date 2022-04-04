@@ -1,40 +1,42 @@
 class Post {
-  String uid = "";
-  String fullName = "";
-  String id = "";
-  late String postImage;
-  late String caption;
-  String createdDate = "";
-  bool isLiked = false;
-  bool isMine = false;
-  String? imageUser;
+  String? uid;
+  String? fullName;
+  String? img_user;
+  String? id;
+  String img_post;
+  String caption;
+  String? date;
+  bool liked = false;
 
-  Post({
-    required this.postImage,
-    required this.caption,
-  });
+  bool mine = false;
 
-  Post.fromJson(Map<String, dynamic> json) {
-    uid = json["uid"];
-    fullName = json["fullName"];
-    id = json["id"];
-    postImage = json["postImage"];
-    caption = json["caption"];
-    createdDate = json["createdDate"];
-    isLiked = json["isLiked"];
-    isMine = json["isMine"];
-    imageUser = json["imageUser"];
-  }
+  Post(
+      {required this.img_post,
+        required this.caption,
+        this.uid,
+        this.fullName,
+        this.img_user,
+        this.id,
+        this.date});
+
+  Post.fromJson(Map<String, dynamic> json)
+      : uid = json["uid"],
+        fullName = json["fullName"],
+        img_user = json["img_user"],
+        id = json["id"],
+        img_post = json["img_post"],
+        caption = json["caption"],
+        date = json["date"],
+        liked = json["liked"];
 
   Map<String, dynamic> toJson() => {
     "uid": uid,
     "fullName": fullName,
+    "img_user": img_user,
     "id": id,
-    "postImage": postImage,
+    "img_post": img_post,
     "caption": caption,
-    "createdDate": createdDate,
-    "isLiked": isLiked,
-    "isMine": isMine,
-    "imageUser": imageUser,
+    "date": date,
+    "liked": liked
   };
 }

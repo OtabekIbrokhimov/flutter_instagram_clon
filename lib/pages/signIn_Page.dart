@@ -1,13 +1,11 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_instagram_clon/models/user.model.dart';
 import 'package:flutter_instagram_clon/pages/signUp_Page.dart';
 import 'package:flutter_instagram_clon/servises/auth_servise.dart';
+import 'package:flutter_instagram_clon/servises/data_servise.dart';
 import 'package:flutter_instagram_clon/servises/pref_servise.dart';
-import 'package:flutter_instagram_clon/views/button%20widget.dart';
-import 'package:flutter_instagram_clon/views/textfield_widget.dart';
-
-import '../utils/theme.dart';
 import '../utils/utilServise.dart';
 import 'homePage.dart';
 
@@ -19,92 +17,191 @@ class SignInPage extends StatefulWidget {
 }
 
 class _SignInPageState extends State<SignInPage> {
+  bool isLoading = false;
   TextEditingController emailController = TextEditingController();
   TextEditingController passwordController = TextEditingController();
 
-  bool isLoading = false;
+  void _callSignUpPage() {
+    Navigator.pushReplacementNamed(context, SignUpPage.id);
+  }
 
-  void _openHomePage() async {
+  void _doSignIn() async {
     String email = emailController.text.trim().toString();
     String password = passwordController.text.trim().toString();
 
-    if(email.isEmpty || password.isEmpty) {
-      Utils.fireSnackBar("Please complete all the fields", context);
+    if (email.isEmpty || password.isEmpty) {
+      // error msg
+      Utils.snackBar('Fields cannot be null or empty', context);
       return;
     }
-
     setState(() {
       isLoading = true;
     });
-
-    await AuthService.signInUser(email, password).then((response) {
-      _getFirebaseUser(response);
-    });
+    await AuthService.signInUser(context, email, password)
+        .then((value) => _getFirebaseUser(value));
   }
 
-  void _getFirebaseUser(User? user) async {
+  void _getFirebaseUser(User? user) {
+    if (user != null) {
+      HiveDB.storeUid(user.uid);
+      _apiUpdateUser();
+      Navigator.pushReplacement(
+          context, MaterialPageRoute(builder: (context) => const HomePage()));
+    }
     setState(() {
       isLoading = false;
     });
+  }
 
-    if(user != null) {
-      Prefs.store(StorageKeys.UID, user.uid);
-      Navigator.pushReplacementNamed(context, HomePage.id);
-    } else {
-      Utils.fireSnackBar("Check Your Information", context);
-    }
+  void _apiUpdateUser() async {
+    UserModel userModel = await DataService.loadUser(null);
+    userModel.device_token = HiveDB.loadFCM();
+    await DataService.updateUser(userModel);
+  }
+
+  @override
+  void initState() {
+    // TODO: implement initState
+    super.initState();
+    Utils.initNotification();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SingleChildScrollView(
-        child: Container(
-          height: MediaQuery.of(context).size.height,
-          width: MediaQuery.of(context).size.width,
-          decoration: ThemeService.backgroundGradient,
-          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 20),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              Expanded(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
+        body: SingleChildScrollView(
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            height: MediaQuery.of(context).size.height,
+            decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Color.fromRGBO(193, 53, 132, 1),
+                      Color.fromRGBO(131, 58, 180, 1),
+                    ])),
+            child: Stack(
+              children: [
+                Column(
+                  mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    // #app_name
-                    Text("Instagram", style: TextStyle(color: Colors.white, fontSize: 45, fontFamily: ThemeService.fontHeader),),
-                    SizedBox(height: 20,),
+                    Expanded(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Text(
+                              "Instagram",
+                              style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 45,
+                                  fontFamily: "Bluevinyl"),
+                            ),
+                            const SizedBox(
+                              height: 20,
+                            ),
 
-                    // #email
-                    textField(hintText: "Email", controller: emailController),
-                    SizedBox(height: 10,),
+                            // #email
+                            Container(
+                              height: 50,
+                              padding: const EdgeInsets.symmetric(horizontal: 10),
+                              decoration: BoxDecoration(
+                                  color: Colors.white54.withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(7)),
+                              child: TextField(
+                                controller: emailController,
+                                textInputAction: TextInputAction.next,
+                                style: const TextStyle(color: Colors.white),
+                                decoration: const InputDecoration(
+                                    hintText: "Email",
+                                    border: InputBorder.none,
+                                    hintStyle:
+                                    TextStyle(fontSize: 17, color: Colors.white54)),
+                              ),
+                            ),
+                            const SizedBox(
+                              height: 10,
+                            ),
 
-                    // #password
-                    textField(hintText: "Password", controller: passwordController),
-                    SizedBox(height: 10,),
+                            // #password
+                            Container(
+                              height: 50,
+                              padding: const EdgeInsets.symmetric(horizontal: 10),
+                              decoration: BoxDecoration(
+                                  color: Colors.white54.withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(7)),
+                              child: TextField(
+                                obscureText: true,
+                                controller: passwordController,
+                                textInputAction: TextInputAction.done,
+                                style: const TextStyle(color: Colors.white),
+                                decoration: const InputDecoration(
+                                    hintText: "Password",
+                                    border: InputBorder.none,
+                                    hintStyle:
+                                    TextStyle(fontSize: 17, color: Colors.white54)),
+                              ),
+                            ),
+                            const SizedBox(
+                              height: 10,
+                            ),
 
-                    // #signin
-                    button(title: "Sign In", onPressed: _openHomePage),
+                            // #sign_in
+                            GestureDetector(
+                              onTap: _doSignIn,
+                              child: Container(
+                                height: 50,
+                                padding: const EdgeInsets.symmetric(horizontal: 10),
+                                decoration: BoxDecoration(
+                                    border: Border.all(
+                                        color: Colors.white54.withOpacity(0.2),
+                                        width: 2),
+                                    borderRadius: BorderRadius.circular(7)),
+                                child: const Center(
+                                  child: Text(
+                                    "Sign In",
+                                    style: TextStyle(color: Colors.white, fontSize: 17),
+                                  ),
+                                ),
+                              ),
+                            )
+                          ],
+                        )),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Text(
+                          "Don't have an account?",
+                          style: TextStyle(color: Colors.white, fontSize: 16),
+                        ),
+                        const SizedBox(
+                          width: 10,
+                        ),
+                        GestureDetector(
+                          onTap: _callSignUpPage,
+                          child: const Text(
+                            "Sign Up",
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 17,
+                                fontWeight: FontWeight.bold),
+                          ),
+                        )
+                      ],
+                    ),
+                    const SizedBox(
+                      height: 20,
+                    )
                   ],
                 ),
-              ),
-              RichText(text: TextSpan(
-                  text: "Don't have an account? ",
-                  style: const TextStyle(color: Colors.white),
-                  children: [
-                    TextSpan(
-                      text: "Sign Up",
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                      recognizer: TapGestureRecognizer()..onTap = () {
-                        Navigator.pushReplacementNamed(context, SignUpPage.id);
-                      },
-                    )
-                  ]
-              ),)
-            ],
+                isLoading
+                    ? const Center(
+                  child: CircularProgressIndicator.adaptive(),
+                )
+                    : const SizedBox.shrink()
+              ],
+            ),
           ),
-        ),
-      ),
-    );
+        ));
   }
 }

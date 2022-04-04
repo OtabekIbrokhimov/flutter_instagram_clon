@@ -1,3 +1,4 @@
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_instagram_clon/pages/feedPage.dart';
@@ -5,7 +6,7 @@ import 'package:flutter_instagram_clon/pages/likesPage.dart';
 import 'package:flutter_instagram_clon/pages/profilePage.dart';
 import 'package:flutter_instagram_clon/pages/searchPage.dart';
 import 'package:flutter_instagram_clon/pages/uploadPage.dart';
-import 'package:flutter_instagram_clon/utils/theme.dart';
+import 'package:flutter_instagram_clon/utils/utilServise.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({Key? key}) : super(key: key);
@@ -16,31 +17,52 @@ static const String id = "/HomePage";
 }
 
 class _HomePageState extends State<HomePage> {
-  PageController pageController = PageController();
-  int currentPage = 0;
+  final PageController _pageController = PageController();
+  int _currentTap = 0;
+
+  _initNotification() {
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      Utils.showLocalNotification(message, context);
+    });
+    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+      Utils.showLocalNotification(message, context);
+    });
+  }
+
+  @override
+  void initState() {
+    // TODO: implement initState
+    super.initState();
+    _initNotification();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: PageView(
-        controller: pageController,
-        children: [
-          FeedPage(pageController: pageController,),
-          SearchPage(),
-          UploadPage(),
-          Likes(),
-          ProfilePage(),
-        ],
+        controller: _pageController,
         onPageChanged: (index) {
           setState(() {
-            currentPage = index;
+            _currentTap = index;
           });
         },
+        children: [
+          FeedPage(pageController: _pageController),
+          const SearchPage(),
+          UploadPage(pageController: _pageController),
+          const Likes(),
+          const ProfilePage()
+        ],
       ),
       bottomNavigationBar: CupertinoTabBar(
-        currentIndex: currentPage,
-        backgroundColor: Colors.white54,
-        activeColor: Colors.purple,
+        onTap: (index) {
+          setState(() {
+            _currentTap = index;
+            _pageController.jumpToPage(index);
+          });
+        },
+        currentIndex: _currentTap,
+        activeColor: const Color.fromRGBO(193, 53, 132, 1),
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home)),
           BottomNavigationBarItem(icon: Icon(Icons.search)),
@@ -48,9 +70,6 @@ class _HomePageState extends State<HomePage> {
           BottomNavigationBarItem(icon: Icon(Icons.favorite)),
           BottomNavigationBarItem(icon: Icon(Icons.account_circle)),
         ],
-        onTap: (index) {
-          pageController.jumpToPage(index);
-        },
       ),
     );
   }
