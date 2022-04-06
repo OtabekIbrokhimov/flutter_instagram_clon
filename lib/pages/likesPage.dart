@@ -78,7 +78,7 @@ class _LikesState extends State<Likes> {
           title: const Text(
             "Likes",
             style: TextStyle(
-                color: Colors.black, fontSize: 25, fontFamily: "Bluevinyl"),
+                color: Colors.black, fontSize: 25, fontFamily: "Billabong"),
           ),
           centerTitle: true,
         ),

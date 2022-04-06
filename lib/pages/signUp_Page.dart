@@ -111,7 +111,7 @@ class _SignUpPageState extends State<SignUpPage> {
                               style: TextStyle(
                                   color: Colors.white,
                                   fontSize: 45,
-                                  fontFamily: "Bluevinyl"),
+                                  fontFamily: "Billabong"),
                             ),
                             const SizedBox(
                               height: 20,

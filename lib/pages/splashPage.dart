@@ -59,7 +59,7 @@ class _SplashPageState extends State<SplashPage> {
                     child: Text(
                       "Instagram",
                       style: TextStyle(
-                          color: Colors.white, fontSize: 45, fontFamily: "Bluevinyl"),
+                          color: Colors.white, fontSize: 45, fontFamily: "Billabong"),
                     ),
                   )),
               Text(

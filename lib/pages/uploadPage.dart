@@ -114,7 +114,7 @@ class _UploadPageState extends State<UploadPage> {
         title: const Text(
           "Upload",
           style: TextStyle(
-              color: Colors.black, fontSize: 25, fontFamily: "Bluevinyl"),
+              color: Colors.black, fontSize: 25, fontFamily: "Billabong"),
         ),
         actions: [
           IconButton(
