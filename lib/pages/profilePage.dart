@@ -157,7 +157,7 @@ class _ProfilePageState extends State<ProfilePage> {
           title: const Text(
             "Profile",
             style: TextStyle(
-                color: Colors.black, fontSize: 25, fontFamily: "Bluevinyl"),
+                color: Colors.black, fontSize: 25, fontFamily: "Billabong"),
           ),
           centerTitle: true,
           actions: [
@@ -190,7 +190,7 @@ class _ProfilePageState extends State<ProfilePage> {
                             borderRadius: BorderRadius.circular(35),
                             child: img_url == ""
                                 ? Image.asset(
-                              "assets/images/background.png",
+                              "assets/images/user.png",
                               width: 70,
                               height: 70,
                             )

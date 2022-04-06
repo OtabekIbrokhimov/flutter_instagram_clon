@@ -99,7 +99,7 @@ class _FeedPageState extends State<FeedPage> {
           title: const Text(
             "Instagram",
             style: TextStyle(
-                color: Colors.black, fontSize: 25, fontFamily: "Bluevinyl"),
+                color: Colors.black, fontSize: 25, fontFamily: "Billabong"),
           ),
           centerTitle: true,
           actions: [
@@ -147,7 +147,7 @@ class _FeedPageState extends State<FeedPage> {
                 borderRadius: BorderRadius.circular(40),
                 child: post.img_user!.isEmpty || post.img_user == null
                     ? Image.asset(
-                  "assets/images/background.png",
+                  "assets/images/user.png",
                   width: 40,
                   height: 40,
                   fit: BoxFit.cover,

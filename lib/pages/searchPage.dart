@@ -81,7 +81,7 @@ class _SearchPageState extends State<SearchPage> {
           title: const Text(
             "Search",
             style: TextStyle(
-                color: Colors.black, fontSize: 25, fontFamily: "Bluevinyl"),
+                color: Colors.black, fontSize: 25, fontFamily: "Billabong"),
           ),
           centerTitle: true,
         ),
